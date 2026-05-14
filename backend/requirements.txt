@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+tortoise-orm[asyncpg]
+aerich
+google-genai
+httpx
+tavily-python
+pypdf
+beautifulsoup4
+playwright
+python-dotenv
+tenacity
+structlog
+websockets
+slowapi
+python-jose
+sentence-transformers
