@@ -65,6 +65,7 @@ async def run(goal_id: str):
         await notify(goal_id, "workflow complete")
 
     except Exception as e:
+        print("AGENT ERROR [engine]:", str(e))
         goal = await Goal.get_or_none(id=goal_id)
         if goal:
             goal.status = "failed"

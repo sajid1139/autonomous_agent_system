@@ -1,9 +1,11 @@
 import os
 import json
-from google import genai
+import asyncio
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 async def check(result: str, task_name: str) -> dict:
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     prompt = (
         f'Rate this agent output for task "{task_name}" on a scale 1-10. '
         'Reply ONLY with a JSON object: {"score": 7, "reason": "short reason"} '
@@ -11,10 +13,12 @@ async def check(result: str, task_name: str) -> dict:
         f"{result}"
     )
     try:
-        res = await client.aio.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
+        res = await asyncio.to_thread(
+            lambda: client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}]
+            )
         )
-        return json.loads(res.text.strip())
+        return json.loads(res.choices[0].message.content.strip())
     except Exception:
         return {"score": 5, "reason": "parse error"}

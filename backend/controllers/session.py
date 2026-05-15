@@ -7,7 +7,7 @@ router = APIRouter()
 @router.get("/sessions/{goal_id}")
 async def get_session(goal_id: str):
     tasks = await Task.filter(goal_id=goal_id).order_by("order").values()
-    report = await Report.get_or_none(goal_id=goal_id)
+    report = await Report.filter(goal_id=goal_id).order_by("-created").first()
     return {
         "tasks": tasks,
         "report": {"content": report.content, "created": report.created} if report else None

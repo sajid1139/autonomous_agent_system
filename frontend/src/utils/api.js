@@ -9,7 +9,7 @@ export async function post(url, data) {
   return res.data;
 }
 
-export async function get(url) {
+export const get = async (url) => {
   const res = await client.get(url);
   return res.data;
 }

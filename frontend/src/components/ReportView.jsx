@@ -19,6 +19,7 @@ function download(content) {
 export default function ReportView({ goalId }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
+  const [imgs, setImgs] = useState([]);
   const timer = useRef(null);
 
   async function load() {
@@ -30,6 +31,10 @@ export default function ReportView({ goalId }) {
       setData(session);
       if (goal.status === "done" || goal.status === "failed") {
         clearInterval(timer.current);
+        try {
+          const ir = await get(`/goals/${goalId}/images`);
+          setImgs(ir.images || []);
+        } catch {}
       }
     } catch {
       setErr("failed to load session");
@@ -44,62 +49,152 @@ export default function ReportView({ goalId }) {
     return () => clearInterval(timer.current);
   }, [goalId]);
 
+  function dotColor(s) {
+    if (s === "done") return "#10b981";
+    if (s === "running") return "#9333ea";
+    if (s === "failed") return "#ef4444";
+    return "#444";
+  }
+
+  const mdComponents = {
+    h1: ({ children }) => <h1 style={{ color: "#ffffff", fontWeight: 700, fontSize: "16px", margin: "12px 0 6px" }}>{children}</h1>,
+    h2: ({ children }) => <h2 style={{ color: "#9333ea", fontWeight: 700, fontSize: "14px", margin: "10px 0 4px" }}>{children}</h2>,
+    h3: ({ children }) => <h3 style={{ color: "#ffffff", fontWeight: 700, fontSize: "13px", margin: "8px 0 4px" }}>{children}</h3>,
+    p: ({ children }) => <p style={{ color: "#e2e8f0", fontSize: "13px", lineHeight: 1.7, margin: "4px 0" }}>{children}</p>,
+    li: ({ children }) => <li style={{ color: "#e2e8f0", fontSize: "13px" }}>{children}</li>,
+    ul: ({ children }) => <ul style={{ paddingLeft: "20px", color: "#e2e8f0" }}>{children}</ul>,
+    ol: ({ children }) => <ol style={{ paddingLeft: "20px", color: "#e2e8f0" }}>{children}</ol>,
+    strong: ({ children }) => <strong style={{ color: "#ffffff", fontWeight: 700 }}>{children}</strong>,
+    hr: () => <hr style={{ borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", borderWidth: "1px 0 0 0", margin: "12px 0" }} />,
+    a: ({ children, href }) => <a href={href} style={{ color: "#9333ea" }} target="_blank" rel="noreferrer">{children}</a>,
+    code: ({ children }) => <code className="mono" style={{ background: "#1a1a1a", color: "#10b981", padding: "2px 6px", borderRadius: "4px" }}>{children}</code>,
+  };
+
   if (err) {
     return (
-      <div className="flex items-center justify-center h-full text-red-400 text-sm">
-        {err}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: "#050505", borderRadius: "8px" }}>
+        <span className="mono" style={{ color: "#ef4444", fontSize: "12px" }}>❯ {err}</span>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-        loading session...
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", background: "#050505", borderRadius: "8px" }}>
+        <span className="mono" style={{ color: "var(--text-muted)", fontSize: "12px" }}>❯ Loading session...</span>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto space-y-4 p-4">
-      <div className="space-y-2">
-        {data.tasks.length === 0 && (
-          <p className="text-gray-500 text-sm">waiting for tasks...</p>
-        )}
-        {data.tasks.map((t, i) => (
-          <div
-            key={i}
-            className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3 border border-gray-700"
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#050505", borderRadius: "8px", overflow: "hidden" }}>
+      <div style={{
+        background: "#0d0d0d",
+        borderBottom: "1px solid var(--border)",
+        padding: "10px 16px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexShrink: 0,
+      }}>
+        <span className="mono" style={{ color: "var(--accent)", fontSize: "12px" }}>Report</span>
+        {data.report && (
+          <button
+            onClick={() => download(data.report.content)}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--accent)",
+              color: "var(--accent)",
+              borderRadius: "6px",
+              padding: "4px 12px",
+              fontSize: "11px",
+              cursor: "pointer",
+              transition: "background 0.15s, color 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--accent)"; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--accent)"; }}
           >
-            <span className="text-gray-200 text-sm font-medium">{fmt(t.name)}</span>
-            <span
-              className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                t.status === "done"
-                  ? "bg-green-900 text-green-300"
-                  : "bg-yellow-900 text-yellow-300"
-              }`}
-            >
-              {t.status}
-            </span>
-          </div>
-        ))}
+            Download
+          </button>
+        )}
       </div>
-      {data.report && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-indigo-400 font-semibold text-sm">Final Report</h3>
-            <button
-              onClick={() => download(data.report.content)}
-              className="text-xs text-gray-400 hover:text-white border border-gray-600 hover:border-gray-400 px-3 py-1 rounded-md transition-colors"
-            >
-              Download Report
-            </button>
-          </div>
-          <div className="prose prose-invert prose-sm max-w-none text-gray-300">
-            <ReactMarkdown>{data.report.content}</ReactMarkdown>
-          </div>
+
+      {data.tasks.length > 0 && (
+        <div style={{
+          padding: "12px 16px",
+          borderBottom: "1px solid var(--border)",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "8px",
+          flexShrink: 0,
+        }}>
+          {data.tasks.map((t, i) => (
+            <div key={i} className="mono" style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              background: "#0d0d0d",
+              border: "1px solid var(--border)",
+              borderRadius: "20px",
+              padding: "4px 12px",
+              fontSize: "11px",
+            }}>
+              <div style={{
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                background: dotColor(t.status),
+                flexShrink: 0,
+              }} />
+              <span style={{ color: "var(--text)" }}>{fmt(t.name)}</span>
+              <span style={{ color: "var(--text-muted)" }}>{t.status}</span>
+            </div>
+          ))}
         </div>
       )}
+
+      <style>{`@keyframes gradientMove { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }`}</style>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
+        {!data.report ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+            <span className="mono" style={{ color: "var(--text-muted)", fontSize: "12px" }}>❯ Report will appear here...</span>
+          </div>
+        ) : (
+          <div style={{
+            position: "relative",
+            padding: "1px",
+            borderRadius: "8px",
+            background: "linear-gradient(90deg, rgba(255,255,255,0.3), #ffffff, rgba(255,255,255,0.3))",
+            backgroundSize: "200% 200%",
+            animation: "gradientMove 3s ease infinite",
+          }}>
+            <div style={{
+              background: "#050505",
+              borderRadius: "7px",
+              padding: "16px",
+            }}>
+              <ReactMarkdown components={mdComponents}>{data.report.content}</ReactMarkdown>
+            </div>
+          </div>
+        )}
+
+        {imgs.length > 0 && (
+          <div style={{ marginTop: "16px" }}>
+            <span className="mono" style={{ color: "#9333ea", fontSize: "12px", display: "block", marginBottom: "8px" }}>Captured Images</span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+              {imgs.map((src, i) => (
+                <img
+                  key={i}
+                  src={src}
+                  style={{ width: "100%", borderRadius: "6px", objectFit: "cover", height: "120px", border: "1px solid var(--border)" }}
+                  onError={(e) => { e.target.style.display = "none"; }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

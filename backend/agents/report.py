@@ -1,26 +1,55 @@
 import os
-from google import genai
+import asyncio
+from datetime import datetime
+import pytz
+from openai import OpenAI
 from agents.base import Agent
+from models.goal import Goal
 from models.report import Report
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class ReportAgent(Agent):
     def __init__(self):
         super().__init__("report")
 
     async def run(self, task, ctx: dict):
-        all_ctx = "\n\n".join(f"{k}: {v}" for k, v in ctx.items())
-        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        prompt = (
-            "Generate a professional structured report with Summary, Findings, "
-            f"Recommendations sections based on: {all_ctx}"
-        )
-        res = await client.aio.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-        )
-        text = res.text.strip()
-        await Report.create(goal_id=task.goal_id, content=text)
-        return text
+        try:
+            pk_tz = pytz.timezone("Asia/Karachi")
+            now = datetime.now(pk_tz).strftime("%B %d, %Y %I:%M %p PKT")
+            goal = await Goal.get_or_none(id=task.goal_id)
+            goal_text = goal.text if goal else ""
+            research = ctx.get("research", "")
+            summary = ctx.get("summarize", "")
+            prompt = f"""Answer this question directly and concisely:
+
+Question/Goal: {goal_text}
+
+Research: {research}
+
+Summary: {summary}
+
+Date: {now}
+
+Rules:
+- Answer only what was asked
+- No formal headers like Title, Author, Department
+- No "Professional Structured Report" text
+- Use simple headings only if needed
+- Be direct and to the point
+- Include only relevant information"""
+            res = await asyncio.to_thread(
+                lambda: client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}]
+                )
+            )
+            text = res.choices[0].message.content.strip()
+            await Report.create(goal_id=task.goal_id, content=text)
+            return text
+        except Exception as e:
+            print("AGENT ERROR [report]:", str(e))
+            return ""
 
 async def run(task, ctx: dict):
     return await ReportAgent().run(task, ctx)

@@ -1,6 +1,9 @@
 import os
 import json
-from google import genai
+import asyncio
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 sys_prompt = (
     "You are an autonomous task planner. Given a user goal, decompose it into 3-6 subtasks. "
@@ -23,14 +26,17 @@ fallback = [
 ]
 
 async def plan(goal_text: str) -> list[dict]:
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     try:
-        res = await client.aio.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=goal_text,
-            config={"system_instruction": sys_prompt},
+        res = await asyncio.to_thread(
+            lambda: client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": goal_text},
+                ]
+            )
         )
-        raw = res.text.strip()
+        raw = res.choices[0].message.content.strip()
         tasks = json.loads(raw)
         if isinstance(tasks, list) and len(tasks) > 0:
             return tasks

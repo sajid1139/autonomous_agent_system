@@ -5,6 +5,7 @@ export default function useStream(goalId) {
 
   useEffect(() => {
     if (!goalId) return;
+    setLogs([]);
     const ws = new WebSocket(`ws://localhost:8000/ws/${goalId}`);
     ws.onmessage = (e) => setLogs((prev) => [...prev, e.data]);
     return () => ws.close();

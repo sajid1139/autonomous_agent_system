@@ -1,9 +1,12 @@
 import os
 import asyncio
 import httpx
+from urllib.parse import urljoin, urlparse
 from pypdf import PdfReader
 from bs4 import BeautifulSoup
-from google import genai
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 async def run(path: str) -> str:
     ext = os.path.splitext(path)[-1].lower()
@@ -37,7 +40,8 @@ def _sync_scrape(url):
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
-            page.goto(url, wait_until="networkidle", timeout=30000)
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_timeout(3000)
             chunks = []
             seen = set()
 
@@ -63,28 +67,46 @@ def _sync_scrape(url):
                         add(extract_text(page.inner_html("body")))
                 except Exception:
                     pass
+
+            imgs = []
+            base = "{scheme}://{netloc}".format(scheme=urlparse(url).scheme, netloc=urlparse(url).netloc)
+            for el in page.query_selector_all("img"):
+                try:
+                    src = el.get_attribute("src")
+                    if src and not src.startswith("data:"):
+                        abs_url = urljoin(base, src)
+                        if abs_url not in imgs:
+                            imgs.append(abs_url)
+                except:
+                    pass
+
+            print("images found:", len(imgs))
+            for i in imgs[:5]:
+                print("img:", i)
+
             browser.close()
         result = "\n".join(chunks)
         print("scrape_js content length:", len(result))
         print("scrape_js preview:", "\n".join(chunks[:20]))
-        return result
+        return {"text": result, "images": imgs[:20]}
     except Exception as e:
         print("scrape_js error:", str(e))
-        return ""
+        return {"text": "", "images": []}
 
-async def scrape_js(url: str) -> str:
+async def scrape_js(url: str) -> dict:
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, _sync_scrape, url)
 
 async def extract(url: str, query: str) -> str:
     text = await scrape(url)
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     prompt = (
         f"From this webpage content, extract only the information related to: {query}. "
         f"Be specific and concise. Content: {text[:8000]}"
     )
-    res = await client.aio.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
+    res = await asyncio.to_thread(
+        lambda: client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
     )
-    return res.text.strip()
+    return res.choices[0].message.content.strip()
