@@ -41,7 +41,8 @@ Rules:
             res = await asyncio.to_thread(
                 lambda: client.chat.completions.create(
                     model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt}]
+                    messages=[{"role": "user", "content": prompt}],
+                    timeout=30
                 )
             )
             text = res.choices[0].message.content.strip()

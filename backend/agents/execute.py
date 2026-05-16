@@ -16,7 +16,8 @@ class ExecuteAgent(Agent):
             res = await asyncio.to_thread(
                 lambda: client.chat.completions.create(
                     model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt}]
+                    messages=[{"role": "user", "content": prompt}],
+                    timeout=30
                 )
             )
             return res.choices[0].message.content.strip()

@@ -36,30 +36,42 @@ export default function ChatThread({ goalId, extraMsgs = [], loading = false }) 
   const [tasks, setTasks] = useState([]);
   const [fetching, setFetching] = useState(false);
   const bottom = useRef(null);
+  const fetchedFor = useRef(null);
 
   useEffect(() => {
-    if (!goalId) return;
+    if (!goalId || goalId === fetchedFor.current) return;
+    fetchedFor.current = goalId;
+    let aborted = false;
     setFetching(true);
-    console.log("fetching messages for:", goalId);
     Promise.all([
       axios.get("http://localhost:8000/goals/" + goalId + "/messages"),
       axios.get("http://localhost:8000/sessions/" + goalId),
     ])
       .then(([msgRes, sesRes]) => {
-        console.log("messages data:", msgRes.data);
+        if (aborted) return;
         setMsgs(msgRes.data);
         setReport(sesRes.data?.report || null);
         setTasks(sesRes.data?.tasks || []);
       })
-      .catch((e) => console.log("fetch error:", e.message))
-      .finally(() => setFetching(false));
+      .catch((e) => { if (!aborted) console.log("fetch error:", e.message); })
+      .finally(() => { if (!aborted) setFetching(false); });
+    return () => { aborted = true; };
   }, [goalId]);
 
   const allMsgs = [...msgs, ...extraMsgs];
+  const prevLen = useRef(0);
 
   useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
+    const cur = allMsgs.length;
+    if (cur > prevLen.current) {
+      bottom.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevLen.current = cur;
+  }, [allMsgs.length]);
+
+  useEffect(() => {
+    if (loading) bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [loading]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#050505", borderRadius: "8px", overflow: "hidden" }}>
@@ -124,6 +136,7 @@ export default function ChatThread({ goalId, extraMsgs = [], loading = false }) 
         display: "flex",
         flexDirection: "column",
         gap: "12px",
+        minHeight: 0,
       }}>
         {fetching && (
           <span className="mono" style={{ color: "var(--text-muted)", fontSize: "12px", alignSelf: "center" }}>
@@ -153,22 +166,56 @@ export default function ChatThread({ goalId, extraMsgs = [], loading = false }) 
           </span>
         )}
 
-        {allMsgs.map((m) => (
-          <div key={m.id} style={{
-            alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-            background: m.role === "user" ? "var(--accent)" : "#1a1a1a",
-            color: m.role === "user" ? "#fff" : "var(--text)",
-            borderRadius: m.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
-            padding: "10px 14px",
-            maxWidth: "75%",
-            fontSize: "13px",
-            lineHeight: 1.6,
-          }}>
-            {m.role === "user"
-              ? m.content
-              : <ReactMarkdown components={mdComp}>{m.content}</ReactMarkdown>}
-          </div>
-        ))}
+        {allMsgs.map((m) => {
+          const hasImgs = m.role === "assistant" && m.images && m.images.length > 0;
+          const pageImgs = hasImgs ? m.images.filter(s => !s.includes("_img_")) : [];
+          const capImgs = hasImgs ? m.images.filter(s => s.includes("_img_")) : [];
+          const imgFirst = m.images_first === true;
+
+          const textBubble = (
+            <div style={{
+              background: m.role === "user" ? "var(--accent)" : "#1a1a1a",
+              color: m.role === "user" ? "#fff" : "var(--text)",
+              borderRadius: m.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+              padding: "10px 14px",
+              fontSize: "13px",
+              lineHeight: 1.6,
+            }}>
+              {m.role === "user"
+                ? m.content
+                : <ReactMarkdown components={mdComp}>{m.content}</ReactMarkdown>}
+            </div>
+          );
+
+          const imgBlocks = (
+            <>
+              {pageImgs.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <span className="mono" style={{ fontSize: "11px", color: "var(--text-muted)" }}>Page Screenshot</span>
+                  {pageImgs.map((src, i) => (
+                    <img key={i} src={"http://localhost:8000/static/screenshots/" + src.split("/").pop()} alt="page" style={{ width: "100%", borderRadius: "8px", border: "1px solid var(--border)" }} />
+                  ))}
+                </div>
+              )}
+              {capImgs.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <span className="mono" style={{ fontSize: "11px", color: "var(--text-muted)" }}>Captured Images</span>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
+                    {capImgs.map((src, i) => (
+                      <img key={i} src={"http://localhost:8000/static/screenshots/" + src.split("/").pop()} alt={"img " + i} style={{ width: "100%", borderRadius: "6px", border: "1px solid var(--border)" }} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+
+          return (
+            <div key={m.id} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%", display: "flex", flexDirection: "column", gap: "8px" }}>
+              {imgFirst ? <>{imgBlocks}{textBubble}</> : <>{textBubble}{imgBlocks}</>}
+            </div>
+          );
+        })}
 
         {loading && (
           <div style={{

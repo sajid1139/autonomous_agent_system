@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from slowapi import _rate_limit_exceeded_handler
@@ -38,3 +39,4 @@ app.add_middleware(
 app.include_router(goal_router.router)
 app.include_router(session_router.router)
 app.add_api_websocket_route("/ws/{goal_id}", ws_endpoint)
+app.mount("/static", StaticFiles(directory="static"), name="static")

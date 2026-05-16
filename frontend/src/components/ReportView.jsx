@@ -181,17 +181,31 @@ export default function ReportView({ goalId }) {
 
         {imgs.length > 0 && (
           <div style={{ marginTop: "16px" }}>
-            <span className="mono" style={{ color: "#9333ea", fontSize: "12px", display: "block", marginBottom: "8px" }}>Captured Images</span>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
-              {imgs.map((src, i) => (
+            {imgs.filter(s => s.includes("/static/screenshots/") && !s.includes("_img_")).slice(0, 1).map((src, i) => (
+              <div key={"ss" + i} style={{ marginBottom: "16px" }}>
+                <span className="mono" style={{ color: "#9333ea", fontSize: "12px", display: "block", marginBottom: "6px" }}>Page Screenshot</span>
                 <img
-                  key={i}
                   src={src}
-                  style={{ width: "100%", borderRadius: "6px", objectFit: "cover", height: "120px", border: "1px solid var(--border)" }}
+                  style={{ width: "100%", borderRadius: "6px", border: "1px solid var(--border)", display: "block" }}
                   onError={(e) => { e.target.style.display = "none"; }}
                 />
-              ))}
-            </div>
+              </div>
+            ))}
+            {imgs.filter(s => s.includes("_img_")).length > 0 && (
+              <>
+                <span className="mono" style={{ color: "#9333ea", fontSize: "12px", display: "block", marginBottom: "8px" }}>Captured Images</span>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                  {imgs.filter(s => s.includes("_img_")).map((src, i) => (
+                    <img
+                      key={i}
+                      src={src}
+                      style={{ width: "100%", borderRadius: "6px", objectFit: "cover", height: "120px", border: "1px solid var(--border)" }}
+                      onError={(e) => { e.target.style.display = "none"; }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

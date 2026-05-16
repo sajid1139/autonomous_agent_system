@@ -8,8 +8,6 @@ export default function GoalForm({ setGoalId, goalId, isRunning, onSuccess, onEr
   const [loading, setLoading] = useState(false);
 
   async function submit(e) {
-    localStorage.removeItem("ctx_url");
-    localStorage.removeItem("ctx_domain");
     e.preventDefault();
     if (!text.trim()) return;
 
@@ -35,16 +33,6 @@ export default function GoalForm({ setGoalId, goalId, isRunning, onSuccess, onEr
       }
 
       if (res.goal_id) {
-        if (hasUrl) {
-          const match = text.match(url_re);
-          if (match) {
-            try {
-              const domain = new URL(match[0]).hostname;
-              localStorage.setItem("ctx_url", match[0]);
-              localStorage.setItem("ctx_domain", domain);
-            } catch {}
-          }
-        }
         onSuccess && onSuccess();
         setGoalId(res.goal_id);
       } else {
