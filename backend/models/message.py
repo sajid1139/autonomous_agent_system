@@ -5,6 +5,8 @@ class Message(models.Model):
     goal = fields.ForeignKeyField("models.Goal", related_name="messages", on_delete=fields.CASCADE)
     role = fields.CharField(max_length=20)
     content = fields.TextField()
+    images = fields.JSONField(default=list)
+    descriptions = fields.JSONField(default=list)
     created = fields.DatetimeField(auto_now_add=True)
 
     class Meta:

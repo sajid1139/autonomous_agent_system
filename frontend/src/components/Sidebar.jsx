@@ -9,7 +9,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, goalId, setGoalId
       console.log("goals loaded:", data.length);
       setGoals([...data].sort((a, b) => new Date(b.created) - new Date(a.created)));
     }).catch(e => console.log("error:", e.message));
-  }, [goalId]);
+  }, [activeGoalId]);
 
   function fmt(d) {
     return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });

@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,6 +16,8 @@ from controllers import goal as goal_router
 from controllers import session as session_router
 from utils.stream import ws_endpoint
 from security.rate_limiter import limiter
+
+os.makedirs("static/screenshots", exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

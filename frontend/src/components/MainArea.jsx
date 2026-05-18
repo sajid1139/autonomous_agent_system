@@ -21,16 +21,12 @@ function dl(content) {
 export default function MainArea({ goalId, setGoalId, activeGoalId, setActiveGoalId, sidebarOpen }) {
   const [isRunning, setIsRunning] = useState(false);
   const [data, setData] = useState(null);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatMsgs, setChatMsgs] = useState([]);
-  const chatBottom = useRef(null);
   const fullText = "Autonomous Multi-Agent AI Research & Execution System";
   const [displayText, setDisplayText] = useState("");
   const [idx, setIdx] = useState(0);
   const [fwd, setFwd] = useState(true);
   const active = activeGoalId || goalId;
-  const logs = useStream(active, isRunning);
+  const logs = useStream(goalId);
   const bottom = useRef(null);
   const timer = useRef(null);
   const pauseRef = useRef(false);
@@ -95,16 +91,8 @@ export default function MainArea({ goalId, setGoalId, activeGoalId, setActiveGoa
   }, [active]);
 
   useEffect(() => {
-    if (!activeGoalId) { setChatMsgs([]); return; }
-    get("/goals/" + activeGoalId + "/messages").then(setChatMsgs).catch(() => {});
-  }, [activeGoalId]);
-
-  useEffect(() => {
-    if (!activeGoalId) {
-      localStorage.removeItem("ctx_url");
-      localStorage.removeItem("ctx_domain");
-      return;
-    }
+    console.log("activeGoalId changed:", activeGoalId);
+    if (!activeGoalId) return;
     get("/goals/" + activeGoalId).then((g) => {
       if (g.url) {
         localStorage.setItem("ctx_url", g.url);
@@ -121,37 +109,17 @@ export default function MainArea({ goalId, setGoalId, activeGoalId, setActiveGoa
     });
   }, [activeGoalId]);
 
-  useEffect(() => {
-    chatBottom.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMsgs]);
-
-  async function sendChat(e) {
-    e.preventDefault();
-    if (!chatInput.trim() || chatLoading) return;
-    const q = chatInput.trim();
-    setChatInput("");
-    setChatLoading(true);
-    setChatMsgs((prev) => [...prev, { id: Date.now(), role: "user", content: q }]);
-    try {
-      const ctxUrl = localStorage.getItem("ctx_url");
-      const res = await axios.post("http://localhost:8000/goals/" + activeGoalId + "/chat", {
-        query: q,
-        ctx_url: ctxUrl || null,
-      });
-      setChatMsgs((prev) => [...prev, { id: Date.now() + 1, role: "assistant", content: res.data.response, images: res.data.images || [], images_first: res.data.images_first || false }]);
-      if (res.data.used_search === true) {
-        setGoalId(res.data.goal_id);
-        setIsRunning(true);
-      }
-    } catch {}
-    setChatLoading(false);
-  }
-
-  function onGoalSubmit(id) {
+  function onGoalSubmit(id, isDone = false) {
     transitioned.current = false;
-    setGoalId(id);
-    setActiveGoalId(null);
-    setIsRunning(true);
+    if (isDone) {
+      setGoalId(id);
+      setActiveGoalId(id);
+      setIsRunning(false);
+    } else {
+      setGoalId(id);
+      setActiveGoalId(null);
+      setIsRunning(true);
+    }
     setData(null);
   }
 
@@ -214,61 +182,44 @@ export default function MainArea({ goalId, setGoalId, activeGoalId, setActiveGoa
       </div>
 
       <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        {(isRunning || (activeGoalId && chatMsgs.length === 0 && !data)) ? (
-          <div style={{ flex: 1, position: "relative" }}>
-            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" }}>
-              <div style={{ width: "32px", height: "32px", border: "3px solid rgba(255,120,26,0.2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-              <span className="mono" style={{ color: "var(--text-muted)", fontSize: "12px" }}>
-                {isRunning ? "Generating report..." : "Loading..."}
-              </span>
-            </div>
+        {!goalId && !activeGoalId ? (
+          <div style={{
+            flex: 1, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            gap: "16px", padding: "24px",
+          }}>
+            <span style={{ fontSize: "48px", color: "rgba(147,51,234,0.3)", lineHeight: 1 }}>◈</span>
+            <h1 style={{
+              background: "linear-gradient(90deg, #9333ea, #ffffff)",
+              WebkitBackgroundClip: "text", backgroundClip: "text",
+              color: "transparent", WebkitTextFillColor: "transparent",
+              fontSize: "2.2rem", fontWeight: 700, textAlign: "center", margin: 0,
+            }}>
+              What can I do for you?
+            </h1>
+            <GoalForm
+              setGoalId={onGoalSubmit}
+              goalId={goalId}
+              isRunning={isRunning}
+              onSuccess={() => {}}
+              onError={() => {}}
+            />
+            <span className="mono" style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+              Autonomous research • Multi-agent execution • Smart reports
+            </span>
           </div>
         ) : activeGoalId ? (
-          <>
-            <div style={{
-              flex: 1,
-              margin: "8px",
-              overflow: "hidden",
-              borderRadius: "12px",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}>
-              <ChatThread goalId={activeGoalId} extraMsgs={chatMsgs} loading={chatLoading} />
-            </div>
-
-            <div style={{ flexShrink: 0, padding: "12px 24px 20px", display: "flex", justifyContent: "center" }}>
-              <form onSubmit={sendChat} style={{ width: "100%", maxWidth: "800px", display: "flex", gap: "8px" }}>
-                <div style={{
-                  flex: 1, padding: "1px", borderRadius: "16px",
-                  background: chatInput ? "var(--accent)" : "rgba(255,255,255,0.12)",
-                  transition: "background 0.2s",
-                }}>
-                  <input
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Ask about this report..."
-                    style={{
-                      width: "100%", background: "#0d0d0d", border: "none",
-                      borderRadius: "15px", color: "var(--text)", padding: "14px 16px",
-                      fontFamily: "Inter, sans-serif", fontSize: "14px", outline: "none",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-                <button type="submit" disabled={chatLoading} style={{
-                  width: "44px", height: "44px", borderRadius: "50%",
-                  background: "var(--accent)", border: "none", color: "#fff",
-                  cursor: chatLoading ? "not-allowed" : "pointer", fontSize: "16px",
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                }}>
-                  {chatLoading
-                    ? <div style={{ width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-                    : "➤"}
-                </button>
-              </form>
-            </div>
-          </>
+          <div style={{
+            flex: 1,
+            margin: "8px",
+            overflow: "hidden",
+            borderRadius: "12px",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}>
+            <ChatThread goalId={activeGoalId} />
+          </div>
         ) : goalId ? (
-          <>
+          <div style={{ position: "relative", flex: 1, overflow: "hidden" }}>
             <div style={{
               flex: 1,
               display: "flex",
@@ -360,67 +311,26 @@ export default function MainArea({ goalId, setGoalId, activeGoalId, setActiveGoa
               </div>
             </div>
 
-            {data && data.report && (
-              <div style={{ flexShrink: 0, padding: "12px 24px 20px", display: "flex", justifyContent: "center" }}>
-                <form onSubmit={sendChat} style={{ width: "100%", maxWidth: "800px", display: "flex", gap: "8px" }}>
-                  <div style={{
-                    flex: 1, padding: "1px", borderRadius: "16px",
-                    background: chatInput ? "var(--accent)" : "rgba(255,255,255,0.12)",
-                    transition: "background 0.2s",
-                  }}>
-                    <input
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Ask about this report..."
-                      style={{
-                        width: "100%", background: "#0d0d0d", border: "none",
-                        borderRadius: "15px", color: "var(--text)", padding: "14px 16px",
-                        fontFamily: "Inter, sans-serif", fontSize: "14px", outline: "none",
-                        boxSizing: "border-box",
-                      }}
-                    />
-                  </div>
-                  <button type="submit" disabled={chatLoading} style={{
-                    width: "44px", height: "44px", borderRadius: "50%",
-                    background: "var(--accent)", border: "none", color: "#fff",
-                    cursor: chatLoading ? "not-allowed" : "pointer", fontSize: "16px",
-                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                  }}>
-                    {chatLoading
-                      ? <div style={{ width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-                      : "➤"}
-                  </button>
-                </form>
+            {isRunning && (
+              <div style={{
+                position: "absolute",
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: "rgba(0,0,0,0.7)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10,
+              }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" }}>
+                  <div style={{ width: "32px", height: "32px", border: "3px solid rgba(255,120,26,0.2)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                  <span className="mono" style={{ color: "var(--text-muted)", fontSize: "12px" }}>
+                    Generating report...
+                  </span>
+                </div>
               </div>
             )}
-          </>
-        ) : (
-          <div style={{
-            flex: 1, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            gap: "16px", padding: "24px",
-          }}>
-            <span style={{ fontSize: "48px", color: "rgba(147,51,234,0.3)", lineHeight: 1 }}>◈</span>
-            <h1 style={{
-              background: "linear-gradient(90deg, #9333ea, #ffffff)",
-              WebkitBackgroundClip: "text", backgroundClip: "text",
-              color: "transparent", WebkitTextFillColor: "transparent",
-              fontSize: "2.2rem", fontWeight: 700, textAlign: "center", margin: 0,
-            }}>
-              What can I do for you?
-            </h1>
-            <GoalForm
-              setGoalId={onGoalSubmit}
-              goalId={goalId}
-              isRunning={isRunning}
-              onSuccess={() => {}}
-              onError={() => {}}
-            />
-            <span className="mono" style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-              Autonomous research • Multi-agent execution • Smart reports
-            </span>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

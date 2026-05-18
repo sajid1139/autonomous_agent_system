@@ -34,7 +34,7 @@ export default function GoalForm({ setGoalId, goalId, isRunning, onSuccess, onEr
 
       if (res.goal_id) {
         onSuccess && onSuccess();
-        setGoalId(res.goal_id);
+        setGoalId(res.goal_id, res.status === "done");
       } else {
         onSuccess && onSuccess();
       }
@@ -139,7 +139,7 @@ export default function GoalForm({ setGoalId, goalId, isRunning, onSuccess, onEr
             onMouseEnter={(e) => { if (!loading && !isRunning) e.currentTarget.style.background = "var(--accent-hover)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "var(--accent)"; }}
           >
-            {isRunning ? <div className="amar-spinner" /> : "➤"}
+            {(loading || isRunning) ? <div className="amar-spinner" /> : "➤"}
           </button>
         </div>
       </div>
